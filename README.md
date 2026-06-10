@@ -1,0 +1,120 @@
+# claude-browser-stack
+
+A small pack of [Claude Code](https://claude.com/claude-code) skills for
+**browser automation + full-spectrum browser observability**, built on top of
+[vercel-labs/agent-browser](https://github.com/vercel-labs/agent-browser).
+
+Drive a real, *visible* browser from Claude Code so you can watch automation
+happen live — and stream every signal the browser exposes (console, network,
+performance, WebSocket frames, long tasks, layout shifts) while you QA.
+
+## What's in the pack
+
+| Skill | What it does |
+|---|---|
+| `/agent-browser` | **Default.** Attach to your visible local browser via CDP and drive it (navigate, fill, click, snapshot, screenshot). Tab-ownership discipline so it never hijacks your tabs. |
+| `/agent-browser-headless` | Same CLI, headless/background — for scrapes and batch work with no window. |
+| `/watchall` | Full-F12-parity CDP watcher: console + `Log` domain + network + perf metrics + WebSocket frames + long tasks + layout shifts. Always-on capture, filter at read-time. |
+| `/watchconsole` | Lightweight sibling — console + errors only. |
+| `/watchandlearn` | Narrated, step-by-step tour of a UI flow while driving the browser. |
+
+These skills are the Claude-Code-facing layer; the heavy CLI reference is loaded
+on demand from agent-browser itself (`agent-browser skills get core --full`).
+
+## Install
+
+### 1. Install agent-browser (required — this is the engine)
+
+```bash
+npm install -g agent-browser
+agent-browser install
+```
+
+(Also available via `brew install agent-browser` or `cargo install agent-browser`,
+each followed by `agent-browser install`. See the
+[upstream repo](https://github.com/vercel-labs/agent-browser).)
+
+### 2. Install this skill pack
+
+```bash
+git clone https://github.com/jgharbieh/claude-browser-stack.git
+cd claude-browser-stack
+```
+
+Then link the skills into your Claude Code skills directory.
+
+**macOS / Linux:**
+```bash
+./install.sh
+```
+
+**Windows (PowerShell, Developer Mode or admin shell):**
+```powershell
+.\install.ps1
+```
+
+Or do it manually — symlink each skill folder into `~/.claude/skills/`:
+```bash
+ln -sf "$(pwd)/skills/agent-browser"          ~/.claude/skills/agent-browser
+ln -sf "$(pwd)/skills/agent-browser-headless" ~/.claude/skills/agent-browser-headless
+ln -sf "$(pwd)/skills/watchall"               ~/.claude/skills/watchall
+ln -sf "$(pwd)/skills/watchconsole"           ~/.claude/skills/watchconsole
+ln -sf "$(pwd)/skills/watchandlearn"          ~/.claude/skills/watchandlearn
+```
+
+Skills are auto-discovered — they're live in your next Claude Code session.
+
+### 3. Dependency for the watchers (`/watchall`, `/watchconsole`)
+
+The observability watchers use [`chrome-remote-interface`](https://www.npmjs.com/package/chrome-remote-interface):
+
+```bash
+npm install -g chrome-remote-interface
+```
+
+(The `/agent-browser` skills do **not** need this — only the watchers do.)
+
+### 4. (Optional) agent-pods — containerized browsers for parallel sessions
+
+If you want isolated, containerized browsers (Chromium + CDP + noVNC viewer) so a
+Claude session's automation never fights your real browser — e.g. for parallel
+worktrees — install the optional companion:
+
+- **[agent-pods](https://github.com/jgharbieh/agent-pods)**
+
+All skills here detect `.claude/pod.json` and route to the pod's CDP port
+automatically when present. Without pods, everything just uses your local browser
+on port 9222 — pods are entirely optional.
+
+## Quick start
+
+```text
+You: /agent-browser open my staging site and click through the signup flow
+```
+
+Claude probes CDP on 9222, attaches to your visible browser (asking before it
+ever relaunches/closes anything), opens its own labeled tab, and drives it while
+you watch.
+
+```text
+You: /watchall    (then run your QA flow manually)
+```
+
+Claude brings up the watcher in the background and streams every browser signal,
+timestamped, so any bug you hit is already backed by data.
+
+## Notes
+
+- **Any Chromium-family browser works** — Chrome, Brave, Edge, Arc. Set the binary
+  path for your machine in the `/agent-browser` skill (it ships with common
+  Windows/macOS paths as examples).
+- **The browser stays visible by default.** Hidden automation is opt-in via
+  `/agent-browser-headless`.
+- **The watchers see browser-process signal only** — console/network/perf/WS, full
+  F12 parity. Not OS metrics, not server logs.
+- **Safety:** the skills never close or relaunch your browser without explicit
+  confirmation — your live tabs are treated as irreplaceable.
+
+## License
+
+MIT
