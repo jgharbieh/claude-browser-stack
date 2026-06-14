@@ -72,11 +72,12 @@ it locally in the project and use a bare `require('chrome-remote-interface')`.
 
 ```javascript
 const CDP = require('chrome-remote-interface');
-const ts = (t) => {
-  const d = t ? new Date(t * 1000) : new Date();
+const fmt = (d) => {
   const pad = (n) => String(n).padStart(2, '0');
   return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}_${pad(d.getHours())}-${pad(d.getMinutes())}-${pad(d.getSeconds())}`;
 };
+const ts = () => fmt(new Date());        // wall-clock NOW — for WS frames + network (CDP MonotonicTime can't map to wall directly)
+const wall = (ms) => fmt(new Date(ms));  // for CDP Runtime/Log timestamps (milliseconds since epoch)
 const out = (line) => process.stdout.write(line + '\n');
 const PORT = Number(process.env.CDP_PORT || 9222);
 
@@ -117,20 +118,20 @@ async function attach() {
 
   Runtime.consoleAPICalled(({ type, args, timestamp }) => {
     const msg = args.map(a => a.value ?? a.description ?? '').join(' ').slice(0, 500);
-    if (msg.startsWith('__PERFOBS__ LONGTASK')) { out(`[${ts(timestamp)}] [LONGTASK] ${msg.replace('__PERFOBS__ LONGTASK ', '')}`); return; }
-    if (msg.startsWith('__PERFOBS__ CLS')) { out(`[${ts(timestamp)}] [LAYOUT-SHIFT] ${msg.replace('__PERFOBS__ CLS ', '')}`); return; }
+    if (msg.startsWith('__PERFOBS__ LONGTASK')) { out(`[${wall(timestamp)}] [LONGTASK] ${msg.replace('__PERFOBS__ LONGTASK ', '')}`); return; }
+    if (msg.startsWith('__PERFOBS__ CLS')) { out(`[${wall(timestamp)}] [LAYOUT-SHIFT] ${msg.replace('__PERFOBS__ CLS ', '')}`); return; }
     // Full F12 parity — capture EVERYTHING, no noise filtering. Filter at read-time when filing issues, not at capture-time.
-    out(`[${ts(timestamp)}] [${type.toUpperCase()}] ${msg}`);
+    out(`[${wall(timestamp)}] [${type.toUpperCase()}] ${msg}`);
   });
   Runtime.exceptionThrown(({ exceptionDetails, timestamp }) => {
-    out(`[${ts(timestamp/1000)}] [EXCEPTION] ${exceptionDetails.text}`);
+    out(`[${wall(timestamp)}] [EXCEPTION] ${exceptionDetails.text}`);
   });
 
   // Browser-emitted console entries Runtime misses but F12 shows:
   // failed resource loads, CSP violations, deprecations, interventions, mixed-content, network errors.
   Log.entryAdded(({ entry }) => {
     const where = entry.url ? ` ${entry.url.replace(/^https?:\/\/[^/]+/, '')}` : '';
-    out(`[${ts(entry.timestamp/1000)}] [LOG:${entry.level.toUpperCase()}/${entry.source}]${where} ${(entry.text || '').slice(0, 500)}`);
+    out(`[${wall(entry.timestamp)}] [LOG:${entry.level.toUpperCase()}/${entry.source}]${where} ${(entry.text || '').slice(0, 500)}`);
   });
 
   const reqTimes = new Map();
@@ -155,11 +156,11 @@ async function attach() {
   // Generic WebSocket frame logging (works for Convex, Supabase, socket.io, raw WS, etc.)
   Network.webSocketFrameSent(({ response, timestamp }) => {
     const p = (response.payloadData || '').slice(0, 300);
-    if (p) out(`[${ts(timestamp)}] [WS→] ${p}`);
+    if (p) out(`[${ts()}] [WS→] ${p}`);
   });
   Network.webSocketFrameReceived(({ response, timestamp }) => {
     const p = (response.payloadData || '');
-    if (p.includes('error') || p.includes('"success":false')) out(`[${ts(timestamp)}] [WS←ERR] ${p.slice(0, 400)}`);
+    if (p.includes('error') || p.includes('"success":false')) out(`[${ts()}] [WS←ERR] ${p.slice(0, 400)}`);
   });
 
   Page.frameNavigated(async ({ frame }) => {

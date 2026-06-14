@@ -20,10 +20,17 @@ const CDP = require("chrome-remote-interface");
 const arg = (k, d) => { const i = process.argv.indexOf(k); return i >= 0 ? process.argv[i + 1] : d; };
 const port = parseInt(arg("--port", "9222"), 10);
 const dir = arg("--dir", process.cwd());
-const stamp = () => new Date().toISOString().slice(11, 23);
-const line = (file, s) => { try { fs.appendFileSync(path.join(dir, file), `[${stamp()}] ${s}\n`); } catch {} };
+
+// Fail LOUD if the log dir is missing/unwritable — a black-box recorder must never
+// silently drop evidence (this exact silent-fail lost a capture on 2026-06-13).
+fs.mkdirSync(dir, { recursive: true });
+fs.accessSync(dir, fs.constants.W_OK);
+
+const stamp = () => new Date().toISOString();   // full ISO — runs can span long windows
+const line = (file, s) => fs.appendFileSync(path.join(dir, file), `[${stamp()}] ${s}\n`);
 const isApi = (u) => /\/api\//.test(u || "");
 const isConvex = (u) => /convex/i.test(u || "");
+const streamFor = (u) => isConvex(u) ? "convex.txt" : (isApi(u) ? "api.txt" : "network.txt"); // convex BEFORE api
 
 (async () => {
   const client = await CDP({ port });
@@ -41,12 +48,8 @@ const isConvex = (u) => /convex/i.test(u || "");
     line("console.txt", `[EXCEPTION] ${exceptionDetails.text} ${exceptionDetails.exception?.description ?? ""}`));
   Log.entryAdded?.(({ entry }) => line("console.txt", `[${entry.level.toUpperCase()}] ${entry.text}`));
 
-  Network.requestWillBeSent(({ request }) =>
-    line(isApi(request.url) ? "api.txt" : (isConvex(request.url) ? "convex.txt" : "network.txt"),
-         `> ${request.method} ${request.url}`));
-  Network.responseReceived(({ response }) =>
-    line(isApi(response.url) ? "api.txt" : (isConvex(response.url) ? "convex.txt" : "network.txt"),
-         `< ${response.status} ${response.url}`));
+  Network.requestWillBeSent(({ request }) => line(streamFor(request.url), `> ${request.method} ${request.url}`));
+  Network.responseReceived(({ response }) => line(streamFor(response.url), `< ${response.status} ${response.url}`));
   Network.loadingFailed(({ errorText, type }) => line("network.txt", `[FAIL] ${type} ${errorText}`));
   Network.webSocketFrameReceived?.(({ response }) => {
     const txt = (response.payloadData || "").slice(0, 400);

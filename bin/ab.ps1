@@ -21,23 +21,39 @@ if (-not $argv -or $argv.Count -eq 0) {
     exit 2
 }
 
-# Resolve session name from --session, else 'default'.
+# Parse known global flags (and SKIP their values) so the COMMAND is detected
+# correctly. Captures --session / --cdp. Supports "--flag value" and "--flag=value".
 $session = "default"
+$cdp = ""
+$command = $null
 for ($i = 0; $i -lt $argv.Count; $i++) {
-    if ($argv[$i] -eq "--session" -and ($i + 1) -lt $argv.Count) { $session = $argv[$i + 1]; break }
+    $a = [string]$argv[$i]
+    if ($a -eq "--session" -and ($i + 1) -lt $argv.Count) { $session = [string]$argv[$i + 1]; $i++; continue }
+    if ($a -like "--session=*") { $session = $a.Substring(10); continue }
+    if ($a -eq "--cdp" -and ($i + 1) -lt $argv.Count) { $cdp = [string]$argv[$i + 1]; $i++; continue }
+    if ($a -like "--cdp=*") { $cdp = $a.Substring(6); continue }
+    if ($a -like "--*") { continue }   # other flag — skip (we only pass --session/--cdp before the command)
+    if (-not $command) { $command = $a }
 }
 
 $root = if ($env:AB_TRACE_ROOT) { $env:AB_TRACE_ROOT } else { "D:\dev\sandbox" }
 $dir = Join-Path $root $session
 New-Item -ItemType Directory -Force -Path $dir | Out-Null
 
-# If a run is active for this session (run.ps1 start), write the transcript into that
-# run folder so every stream of the run lives together. Otherwise fall back to a per-day file.
+# Transcript destination, in priority order:
+#   1) $env:AB_RUN_DIR (explicit run folder)
+#   2) <session>\.current-run (set by run.ps1 start — requires session name == run name)
+#   3) per-day fallback <session>\transcript-<day>.jsonl
 $inRun = $false
-$ptr = Join-Path $dir ".current-run"
-if (Test-Path $ptr) {
-    $rd = (Get-Content $ptr -Raw).Trim()
-    if ($rd -and (Test-Path $rd)) { $file = Join-Path $rd "transcript.jsonl"; $inRun = $true }
+if ($env:AB_RUN_DIR -and (Test-Path $env:AB_RUN_DIR)) {
+    $file = Join-Path $env:AB_RUN_DIR "transcript.jsonl"; $inRun = $true
+}
+if (-not $inRun) {
+    $ptr = Join-Path $dir ".current-run"
+    if (Test-Path $ptr) {
+        $rd = (Get-Content $ptr -Raw).Trim()
+        if ($rd -and (Test-Path $rd)) { $file = Join-Path $rd "transcript.jsonl"; $inRun = $true }
+    }
 }
 if (-not $inRun) {
     $day = Get-Date -Format "yyyyMMdd"
@@ -62,9 +78,6 @@ if ((-not $inRun) -and (-not (Test-Path $file))) {
     ($hdr | ConvertTo-Json -Compress) | Add-Content -Path $file -Encoding utf8
 }
 
-# First non-flag token = the command (open/click/type/...).
-$command = ($argv | Where-Object { $_ -notlike "--*" } | Select-Object -First 1)
-
 $start = Get-Date
 $out = (& agent-browser @argv 2>&1 | Out-String)
 $code = $LASTEXITCODE
@@ -75,6 +88,7 @@ $evt = [ordered]@{
     type       = "action"
     ts         = $start.ToString("o")
     session    = $session
+    cdp        = $cdp
     command    = $command
     args       = ($argv -join " ")
     durationMs = $dur

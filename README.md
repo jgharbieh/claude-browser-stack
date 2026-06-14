@@ -144,13 +144,23 @@ complete black box** (best for AI search + post-mortems). Default root
 
 Typical loop:
 ```powershell
-$rd = .\bin\run.ps1 start weatherzerone-wt1-agent-pod -Purpose "verify #54"
-$env:NODE_PATH = (npm root -g)                      # so watch.mjs finds chrome-remote-interface
-Start-Process node -Args "bin\watch.mjs","--port","9223","--dir",$rd -WindowStyle Hidden -PassThru
-.\bin\ab.ps1 --session wt1 --cdp 9223 open https://starksai.weathercontracting.com
+# 1) start a run — name it the SAME as the --session you'll pass to ab.ps1
+$rd = .\bin\run.ps1 start wt1 -Purpose "verify #54"
+$env:AB_RUN_DIR = $rd                 # transcript + ab.ps1 land in this exact run folder
+$env:NODE_PATH = (npm root -g)        # so watch.mjs finds chrome-remote-interface
+
+# 2) start the watcher — CAPTURE its pid (never `Stop-Process -Name node`; that kills
+#    your Next/Convex/Vite dev servers too)
+$watch = Start-Process node -ArgumentList "bin\watch.mjs","--port","9223","--dir",$rd -WindowStyle Hidden -PassThru
+
+# 3) drive
+.\bin\ab.ps1 --session wt1 --cdp 9223 open https://staging.example.com
 # ... drive + click ...
-Stop-Process -Name node -ErrorAction SilentlyContinue   # stop the watcher
-.\bin\run.ps1 end weatherzerone-wt1-agent-pod
+
+# 4) stop ONLY the watcher, end the run
+Stop-Process -Id $watch.Id -ErrorAction SilentlyContinue
+$env:AB_RUN_DIR = $null
+.\bin\run.ps1 end wt1
 ```
 
 ## License

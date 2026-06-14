@@ -59,7 +59,7 @@ const CDP = require('chrome-remote-interface');
   await Network.enable();
   Runtime.consoleAPICalled(({ type, args, timestamp }) => {
     const msg = args.map(a => a.value ?? a.description ?? '').join(' ');
-    const t = new Date(timestamp * 1000).toISOString().slice(11, 23);
+    const t = new Date(timestamp).toISOString().slice(11, 23);
     console.log(`[${t}] [${type.toUpperCase()}] ${msg}`);
   });
   Runtime.exceptionThrown(({ exceptionDetails }) => {
