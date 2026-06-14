@@ -115,6 +115,44 @@ timestamped, so any bug you hit is already backed by data.
 - **Safety:** the skills never close or relaunch your browser without explicit
   confirmation — your live tabs are treated as irreplaceable.
 
+## Structured run logs (`bin/`)
+
+Helper scripts that capture a QA/verify session as **one run = one folder = the
+complete black box** (best for AI search + post-mortems). Default root
+`D:\dev\sandbox` (override with `AB_TRACE_ROOT`).
+
+```
+<root>\<pod>\
+├── docker-<stamp>.log               pod-lifetime container logs (from agent-pods)
+└── <start>-<end>\                   one RUN (folder name = start-end timestamps)
+    ├── env.json        git SHA, pod, purpose, cwd, host, timestamps
+    ├── console.txt     console.* + exceptions + Log entries
+    ├── network.txt     requests / responses / failures
+    ├── api.txt         /api/* calls
+    ├── convex.txt      Convex HTTP + WebSocket frames
+    ├── performance.txt DOM nodes / JS heap / listeners / layout count (3s sample)
+    ├── server.txt      app dev-server stdout (redirect here)
+    └── transcript.jsonl agent-browser actions (auto-written by ab.ps1)
+```
+
+| Tool | What it does |
+|---|---|
+| `bin\run.ps1 start <pod> [-Purpose "verify #54"]` | mint a run folder, print its path, mark it active |
+| `bin\run.ps1 end <pod>` | stamp end time, finalize folder name `<start>-<end>` |
+| `bin\ab.ps1 <agent-browser args>` | traced wrapper — every call appended to the active run's `transcript.jsonl` |
+| `bin\watch.mjs --port <cdp> --dir <run>` | CDP watcher — writes console/network/api/convex/performance into the run folder |
+
+Typical loop:
+```powershell
+$rd = .\bin\run.ps1 start weatherzerone-wt1-agent-pod -Purpose "verify #54"
+$env:NODE_PATH = (npm root -g)                      # so watch.mjs finds chrome-remote-interface
+Start-Process node -Args "bin\watch.mjs","--port","9223","--dir",$rd -WindowStyle Hidden -PassThru
+.\bin\ab.ps1 --session wt1 --cdp 9223 open https://starksai.weathercontracting.com
+# ... drive + click ...
+Stop-Process -Name node -ErrorAction SilentlyContinue   # stop the watcher
+.\bin\run.ps1 end weatherzerone-wt1-agent-pod
+```
+
 ## License
 
 MIT
