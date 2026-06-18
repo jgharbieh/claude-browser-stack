@@ -103,6 +103,40 @@ You: /watchall    (then run your QA flow manually)
 Claude brings up the watcher in the background and streams every browser signal,
 timestamped, so any bug you hit is already backed by data.
 
+## In the wild — a UI-perf bug, proven not vibed
+
+The point of a *visible* browser wired to CDP isn't just driving clicks — it's turning subjective front-end complaints into hard numbers. A real example from a production CRM, start to finish in one session:
+
+**The ticket:** *"Theme switching feels sluggish."* No stack trace, no failing test — a feeling. (And a landmine: an earlier fix had already been reverted for tanking scroll performance app-wide.)
+
+**What the stack did:**
+
+- Drove a pod browser to the real authenticated app — a **31,000-node DOM**, actual conditions, not a toy page — while a human watched live over noVNC.
+- Throttled the CPU to **11.7×** (`Emulation.setCPUThrottlingRate`) to stretch a one-frame stagger into something measurable.
+- Snapshotted `getComputedStyle` at the **exact style recalc** of the theme swap, via a `MutationObserver` on the swap marker.
+- Triggered the app's **real** code path (the theme picker's own `localStorage` write + change event), not a synthetic shortcut.
+- Reproduced the bug **and** the fix on the same page by toggling the fix's CSS rule at runtime — an honest before/after.
+
+**The proof** — `<body>` at the swap recalc, light → dark:
+
+| | transition | background | result |
+|---|---|---|---|
+| **Bug** | `0.32s` (live) | still the **old** color | borders/text animate a frame behind the bg → visible "wave" |
+| **Fixed** | **`0s`** (suppressed) | already the **new** color | every property, one frame → **atomic snap** |
+
+| Light start | Fixed — +40ms after switch | Bug — +40ms after switch |
+|---|---|---|
+| ![light start](docs/img/crm-theme-before.png) | ![fixed, atomic](docs/img/crm-theme-fixed.png) | ![bug, the wave](docs/img/crm-theme-bug.png) |
+| the dashboard before | fully dark, one frame later — **atomic** | mid-crossfade — **the wave** |
+
+<sub>Captured by the agent over CDP at 11.7× CPU throttle on a real CRM dashboard.</sub>
+
+Then it ran a production build and re-ran the **entire** instrument: identical result — the fix held through minification. A subjective complaint became measured engineering — dev *and* prod, with a human watching the browser the whole time. That's the stack.
+
+> **100% AI in the loop.** The only human input was the prompt: *"fix it."* The agent reproduced the bug, root-caused it, wrote the fix, verified it on a dev server **and** a production build, and produced the full measured trace — in a single chat. Pushed, tested, and prod-ready when that first chat ended. It was that good.
+
+That instrument is shipped — [`bin/paint-probe.mjs`](bin/paint-probe.mjs). Point it at any page, pass the trigger that causes your restyle, and it prints the same per-recalc snapshots + a screenshot burst (CPU-throttled, with an optional `--disable-rule` baseline for an honest before/after).
+
 ## Notes
 
 - **Any Chromium-family browser works** — Chrome, Brave, Edge, Arc. Set the binary
