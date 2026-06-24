@@ -36,6 +36,18 @@ each followed by `agent-browser install`. See the
 
 ### 2. Install this skill pack
 
+**Recommended — as a Claude Code plugin** (no clone, no symlinks):
+
+```
+/plugin marketplace add jgharbieh/claude-browser-stack
+/plugin install claude-browser-stack@claude-browser-stack
+```
+
+All five skills are live in your next session.
+
+<details>
+<summary><b>Alternative — clone + symlink</b> (if you want the skills editable on disk)</summary>
+
 ```bash
 git clone https://github.com/jgharbieh/claude-browser-stack.git
 cd claude-browser-stack
@@ -63,6 +75,8 @@ ln -sf "$(pwd)/skills/watchandlearn"          ~/.claude/skills/watchandlearn
 ```
 
 Skills are auto-discovered — they're live in your next Claude Code session.
+
+</details>
 
 ### 3. Dependency for the watchers (`/watchall`, `/watchconsole`)
 

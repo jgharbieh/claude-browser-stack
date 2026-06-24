@@ -1,0 +1,22 @@
+{
+  "$schema": "https://anthropic.com/claude-code/marketplace.schema.json",
+  "name": "claude-browser-stack",
+  "description": "Browser automation + full-spectrum observability skills for Claude Code.",
+  "owner": { "name": "Joseph Gharbieh" },
+  "plugins": [
+    {
+      "name": "claude-browser-stack",
+      "description": "Drive a visible local browser via CDP (navigate, fill, click, snapshot) and stream every browser signal (console, network, perf, WebSocket frames, long tasks, layout shifts). Built on vercel-labs/agent-browser.",
+      "source": "./",
+      "strict": false,
+      "category": "development",
+      "skills": [
+        "./skills/agent-browser",
+        "./skills/agent-browser-headless",
+        "./skills/watchall",
+        "./skills/watchconsole",
+        "./skills/watchandlearn"
+      ]
+    }
+  ]
+}
