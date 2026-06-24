@@ -1,0 +1,11 @@
+{
+  "$schema": "https://anthropic.com/claude-code/plugin.schema.json",
+  "name": "claude-browser-stack",
+  "version": "0.1.0",
+  "description": "Claude Code skills for browser automation + full-spectrum browser observability, built on vercel-labs/agent-browser.",
+  "author": { "name": "Joseph Gharbieh" },
+  "homepage": "https://github.com/jgharbieh/claude-browser-stack",
+  "repository": "https://github.com/jgharbieh/claude-browser-stack",
+  "license": "MIT",
+  "keywords": ["browser", "automation", "cdp", "observability", "agent-browser", "qa"]
+}
